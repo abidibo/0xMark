@@ -5,5 +5,5 @@ Comment=Annotate the image in the clipboard
 Exec=0xmark
 Icon=image-x-generic
 Terminal=false
-Categories=Graphics;Utility;
+Categories=Graphics;
 Keywords=screenshot;annotate;clipboard;
