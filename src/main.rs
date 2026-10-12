@@ -857,6 +857,7 @@ fn main() -> glib::ExitCode {
         .build();
 
     app.connect_startup(|_| {
+        gtk::Window::set_default_icon_name(APP_ID);
         let provider = gtk::CssProvider::new();
         provider.load_from_string(&css());
         if let Some(display) = gdk::Display::default() {

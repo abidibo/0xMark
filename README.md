@@ -49,10 +49,18 @@ git clone https://github.com/abidibo/0xMark.git
 cd 0xMark
 cargo build --release
 install -Dm755 target/release/0xmark ~/.local/bin/0xmark
-install -Dm644 data/0xmark.desktop ~/.local/share/applications/0xmark.desktop
+install -Dm644 data/icons/dev.abidibo.OxMark.svg \
+  ~/.local/share/icons/hicolor/scalable/apps/dev.abidibo.OxMark.svg
+touch ~/.local/share/icons/hicolor
+mkdir -p ~/.local/share/applications
+sed "s|^Exec=0xmark$|Exec=$HOME/.local/bin/0xmark|" data/dev.abidibo.OxMark.desktop \
+  > ~/.local/share/applications/dev.abidibo.OxMark.desktop
 ```
 
-Make sure `~/.local/bin` is on your `PATH`. Check with `which 0xmark`.
+The `sed` line writes the full path of the binary into the desktop entry. Some GNOME sessions do
+not have `~/.local/bin` on their `PATH`, and GNOME silently hides desktop entries whose program it
+cannot find. The `touch` line tells running apps, such as GNOME Shell or a launcher, to
+reload icons.
 
 0xMark now shows up in the GNOME app grid. You can also run `0xmark` from a terminal.
 
@@ -61,7 +69,8 @@ Make sure `~/.local/bin` is on your `PATH`. Check with `which 0xmark`.
 The app is meant to be opened instantly, so bind it to a key:
 
 1. Open **Settings > Keyboard > View and Customize Shortcuts > Custom Shortcuts**.
-2. Add a shortcut with name `0xMark` and command `0xmark`.
+2. Add a shortcut with name `0xMark`. For the command, use the full path, for example
+   `/home/you/.local/bin/0xmark`. Run `echo ~/.local/bin/0xmark` to get yours.
 3. Pick a key combination, for example `Super+Shift+A`.
 
 ## Usage
@@ -93,6 +102,9 @@ Press `Esc` to close without touching the clipboard.
 
 ## Troubleshooting
 
+**0xMark is missing from the app grid or your launcher.** The desktop entry probably still says
+`Exec=0xmark` and your session cannot find it. Repeat the `sed` step from the install section.
+
 **"No image in clipboard".** The clipboard holds text or nothing. Copy an image and press
 `Ctrl+V` in the window.
 
@@ -104,7 +116,9 @@ Press `Esc` to close without touching the clipboard.
 ## Uninstall
 
 ```sh
-rm ~/.local/bin/0xmark ~/.local/share/applications/0xmark.desktop
+rm ~/.local/bin/0xmark \
+   ~/.local/share/applications/dev.abidibo.OxMark.desktop \
+   ~/.local/share/icons/hicolor/scalable/apps/dev.abidibo.OxMark.svg
 ```
 
 ## How it works
