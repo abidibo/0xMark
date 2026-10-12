@@ -5,6 +5,8 @@ A tiny GNOME app for marking up images on the clipboard.
 Copy an image, open 0xMark, draw a box or an arrow, press `Enter`. The annotated image is back on
 the clipboard, ready to paste into chat, email, an issue tracker or a document.
 
+![0xMark with an image loaded, a blue rectangle drawn on it and the floating toolbar at the bottom](screenshot.png)
+
 ## Features
 
 - Loads the clipboard image automatically when the window opens.
@@ -43,7 +45,7 @@ sudo pacman -S base-devel gtk4 libadwaita wl-clipboard
 ## Install
 
 ```sh
-git clone <this-repo> 0xMark
+git clone https://github.com/abidibo/0xMark.git
 cd 0xMark
 cargo build --release
 install -Dm755 target/release/0xmark ~/.local/bin/0xmark
