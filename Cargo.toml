@@ -1,0 +1,18 @@
+[package]
+name = "oxmark"
+version = "0.1.0"
+edition = "2024"
+description = "Paste an image from the clipboard, annotate it, copy it back."
+
+[[bin]]
+name = "0xmark"
+path = "src/main.rs"
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+cairo = { package = "cairo-rs", version = "0.22", features = ["png"] }
+
+[profile.release]
+strip = true
+lto = "thin"

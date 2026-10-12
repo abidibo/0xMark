@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=0xMark
+Comment=Annotate the image in the clipboard
+Exec=0xmark
+Icon=image-x-generic
+Terminal=false
+Categories=Graphics;Utility;
+Keywords=screenshot;annotate;clipboard;
