@@ -16,33 +16,58 @@ the clipboard, ready to paste into chat, email, an issue tracker or a document.
 - Exports at the original resolution, whatever the zoom level in the window.
 - Follows the GNOME light or dark style.
 
-## Requirements
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | bash
+```
+
+The script:
+
+1. installs the system packages it needs with `apt`, `dnf` or `pacman`, asking for your password
+   only when something is missing
+2. installs Rust with [rustup](https://rustup.rs) if you don't have a recent enough version. It
+   doesn't change your default toolchain if you already use rustup
+3. downloads and builds 0xMark
+4. installs the binary to `~/.local/bin/0xmark` and adds 0xMark to the GNOME app grid
+5. binds **Super+Shift+A** to open 0xMark, unless that shortcut is already taken
+
+Run it again to update. Pick another key with `OXMARK_HOTKEY`, or pass an empty value to skip
+the shortcut:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | OXMARK_HOTKEY='<Super><Shift>m' bash
+```
+
+You can change the shortcut later in **Settings > Keyboard > View and Customize Shortcuts >
+Custom Shortcuts**.
+
+From a clone, `./install.sh` builds and installs that checkout instead of downloading one.
+
+### Requirements
 
 - Linux with a **GNOME Wayland** session. X11 sessions are not supported.
 - GTK 4.14 or newer and libadwaita 1.5 or newer. Ubuntu 24.04, Pop!\_OS 24.04 and Fedora 40 or
-  newer have these.
+  newer have these. Ubuntu 22.04 does not.
 - `wl-clipboard`, which provides the `wl-copy` command.
-- A Rust toolchain to build it. Install one from <https://rustup.rs> if you don't have it.
+- Rust 1.85 or newer to build it.
 
-### Ubuntu, Pop!\_OS, Debian
+The installer takes care of everything except the session and the distribution version.
 
-```sh
-sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev wl-clipboard
-```
+### Manual install
 
-### Fedora
-
-```sh
-sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel wl-clipboard
-```
-
-### Arch
+If you'd rather run each step yourself, install the build dependencies and Rust. On Ubuntu,
+Pop!\_OS or Debian:
 
 ```sh
-sudo pacman -S base-devel gtk4 libadwaita wl-clipboard
+sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev wl-clipboard curl && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && . ~/.cargo/env
 ```
 
-## Install
+On Fedora, `sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel wl-clipboard`. On
+Arch, `sudo pacman -S base-devel gtk4 libadwaita wl-clipboard`. Then install Rust with the
+`curl` command above.
+
+Build and install:
 
 ```sh
 git clone https://github.com/abidibo/0xMark.git
@@ -62,22 +87,15 @@ not have `~/.local/bin` on their `PATH`, and GNOME silently hides desktop entrie
 cannot find. The `touch` line tells running apps, such as GNOME Shell or a launcher, to
 reload icons.
 
-0xMark now shows up in the GNOME app grid. You can also run `0xmark` from a terminal.
-
-### Keyboard shortcut (recommended)
-
-The app is meant to be opened instantly, so bind it to a key:
-
-1. Open **Settings > Keyboard > View and Customize Shortcuts > Custom Shortcuts**.
-2. Add a shortcut with name `0xMark`. For the command, use the full path, for example
-   `/home/you/.local/bin/0xmark`. Run `echo ~/.local/bin/0xmark` to get yours.
-3. Pick a key combination, for example `Super+Shift+A`.
+Then bind a key: open **Settings > Keyboard > View and Customize Shortcuts > Custom Shortcuts**
+and add a shortcut named `0xMark`. For the command, use the full path, which
+`echo ~/.local/bin/0xmark` prints. Pick a combination such as `Super+Shift+A`.
 
 ## Usage
 
 1. Copy an image. For a screenshot, press `Print`, select an area and confirm. GNOME puts the
    screenshot on the clipboard. Copying an image from a browser or an image viewer works too.
-2. Open 0xMark with your shortcut. The image appears right away.
+2. Open 0xMark with your shortcut, `Super+Shift+A` by default. The image appears right away.
 3. Pick a tool, a colour and a size in the toolbar at the bottom, then drag on the image.
    For text, click where the label should go, type it and press `Enter`.
 4. Press `Enter` or click **Copy**. 0xMark closes and the annotated PNG is on the clipboard.
@@ -103,12 +121,16 @@ Press `Esc` to close without touching the clipboard.
 ## Troubleshooting
 
 **0xMark is missing from the app grid or your launcher.** The desktop entry probably still says
-`Exec=0xmark` and your session cannot find it. Repeat the `sed` step from the install section.
+`Exec=0xmark` and your session cannot find it. Run the installer again, or repeat the `sed` step
+from the manual install.
 
 **"No image in clipboard".** The clipboard holds text or nothing. Copy an image and press
 `Ctrl+V` in the window.
 
-**"cannot run wl-copy".** Install `wl-clipboard` using the commands above.
+**"cannot run wl-copy".** Install `wl-clipboard`, or run the installer again.
+
+**The installer says GTK 4.14 or newer is required.** Your distribution is too old. Ubuntu 22.04
+ships GTK 4.6; upgrade to 24.04 or newer.
 
 **The pasted image is empty or the paste fails.** You are probably in an X11 session. Check with
 `echo $XDG_SESSION_TYPE`. It must print `wayland`.
@@ -116,10 +138,11 @@ Press `Esc` to close without touching the clipboard.
 ## Uninstall
 
 ```sh
-rm ~/.local/bin/0xmark \
-   ~/.local/share/applications/dev.abidibo.OxMark.desktop \
-   ~/.local/share/icons/hicolor/scalable/apps/dev.abidibo.OxMark.svg
+curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | bash -s -- --uninstall
 ```
+
+Or `./install.sh --uninstall` from a clone. This removes the binary, the app grid entry, the icon
+and the shortcut. System packages and Rust stay installed.
 
 ## How it works
 
