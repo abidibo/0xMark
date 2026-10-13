@@ -187,3 +187,7 @@ scaled freely while the export stays at full resolution.
 On Wayland, clipboard content belongs to the app that copied it and disappears when that app
 quits. 0xMark therefore hands the final PNG to `wl-copy`, which keeps serving it in the background
 after 0xMark has closed.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
