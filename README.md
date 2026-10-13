@@ -10,7 +10,7 @@ the clipboard, ready to paste into chat, email, an issue tracker or a document.
 ## Features
 
 - Loads the clipboard image automatically when the window opens.
-- Rectangles, arrows, freehand pen and text labels.
+- Rectangles, circles and ellipses, arrows, freehand pen and text labels.
 - Seven colours and three stroke sizes.
 - Undo and redo.
 - Exports at the original resolution, whatever the zoom level in the window.
@@ -113,7 +113,8 @@ and add a shortcut named `0xMark`. For the command, use the full path, which
    screenshot on the clipboard. Copying an image from a browser or an image viewer works too.
 2. Open 0xMark with your shortcut, `Super+Shift+A` by default. The image appears right away.
 3. Pick a tool, a colour and a size in the toolbar at the bottom, then drag on the image.
-   For text, click where the label should go, type it and press `Enter`.
+   Hold `Shift` while dragging a circle to keep it round. For text, click where the label should
+   go, type it and press `Enter`.
 4. Press `Enter` or click **Copy**. 0xMark closes and the annotated PNG is on the clipboard.
 5. Paste it wherever you need it.
 
@@ -121,18 +122,19 @@ Press `Esc` to close without touching the clipboard.
 
 ### Shortcuts
 
-| Key                | Action                            |
-|--------------------|-----------------------------------|
-| `R`                | Rectangle                         |
-| `A`                | Arrow                             |
-| `P`                | Freehand pen                      |
-| `T`                | Text, then click to place         |
-| `1` `2` `3`        | Thin, medium or thick stroke      |
-| `Ctrl+Z`           | Undo                              |
-| `Ctrl+Shift+Z`     | Redo, `Ctrl+Y` also works         |
-| `Ctrl+V`           | Load the clipboard image again    |
-| `Enter` / `Ctrl+C` | Copy the result and close         |
-| `Esc`              | Close without copying             |
+| Key                | Action                                                   |
+|--------------------|----------------------------------------------------------|
+| `R`                | Rectangle                                                |
+| `C`                | Circle, hold `Shift` while dragging for a perfect circle |
+| `A`                | Arrow                                                    |
+| `P`                | Freehand pen                                             |
+| `T`                | Text, then click to place                                |
+| `1` `2` `3`        | Thin, medium or thick stroke                             |
+| `Ctrl+Z`           | Undo                                                     |
+| `Ctrl+Shift+Z`     | Redo, `Ctrl+Y` also works                                |
+| `Ctrl+V`           | Load the clipboard image again                           |
+| `Enter` / `Ctrl+C` | Copy the result and close                                |
+| `Esc`              | Close without copying                                    |
 
 ## Troubleshooting
 

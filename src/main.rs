@@ -18,6 +18,7 @@ const APP_ID: &str = "dev.abidibo.OxMark";
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Tool {
     Rect,
+    Ellipse,
     Arrow,
     Pen,
     Text,
@@ -67,6 +68,8 @@ type Point = (f64, f64);
 #[derive(Clone, Debug)]
 enum Shape {
     Rect { a: Point, b: Point, color: Rgb, width: f64 },
+    /// Fills the box between the two corners.
+    Ellipse { a: Point, b: Point, color: Rgb, width: f64 },
     Arrow { a: Point, b: Point, color: Rgb, width: f64 },
     Pen { points: Vec<Point>, color: Rgb, width: f64 },
     Text { at: Point, text: String, color: Rgb, size: f64 },
@@ -164,6 +167,22 @@ fn draw_shape(cr: &cairo::Context, shape: &Shape) {
             color.set(cr);
             cr.set_line_width(*width);
             cr.rectangle(a.0.min(b.0), a.1.min(b.1), (b.0 - a.0).abs(), (b.1 - a.1).abs());
+            let _ = cr.stroke();
+        }
+        Shape::Ellipse { a, b, color, width } => {
+            let (rx, ry) = ((b.0 - a.0).abs() / 2.0, (b.1 - a.1).abs() / 2.0);
+            // A zero radius would make the scale matrix singular.
+            if rx < 0.5 || ry < 0.5 {
+                return;
+            }
+            color.set(cr);
+            cr.set_line_width(*width);
+            let _ = cr.save();
+            cr.translate((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
+            cr.scale(rx, ry);
+            cr.arc(0.0, 0.0, 1.0, 0.0, TAU);
+            // Stroke after restoring, so the line keeps an even width around the ellipse.
+            let _ = cr.restore();
             let _ = cr.stroke();
         }
         Shape::Arrow { a, b, color, width } => {
@@ -298,6 +317,10 @@ fn glyph(kind: Glyph) -> gtk::DrawingArea {
         match kind {
             Glyph::Tool(Tool::Rect) => {
                 rounded_rect(cr, 2.5, 4.0, 13.0, 10.0, 2.0);
+                let _ = cr.stroke();
+            }
+            Glyph::Tool(Tool::Ellipse) => {
+                cr.arc(9.0, 9.0, 6.5, 0.0, TAU);
                 let _ = cr.stroke();
             }
             Glyph::Tool(Tool::Arrow) => {
@@ -489,6 +512,7 @@ fn build_ui(app: &adw::Application) {
         toggle_group(
             &[
                 (Tool::Rect, Glyph::Tool(Tool::Rect), "Rectangle  (R)".to_string()),
+                (Tool::Ellipse, Glyph::Tool(Tool::Ellipse), "Circle  (C, hold Shift for a perfect circle)".to_string()),
                 (Tool::Arrow, Glyph::Tool(Tool::Arrow), "Arrow  (A)".to_string()),
                 (Tool::Pen, Glyph::Tool(Tool::Pen), "Pen  (P)".to_string()),
                 (Tool::Text, Glyph::Tool(Tool::Text), "Text  (T)".to_string()),
@@ -650,6 +674,7 @@ fn build_ui(app: &adw::Application) {
             let (color, width) = (st.color, st.stroke_width());
             match st.tool {
                 Tool::Rect => st.current = Some(Shape::Rect { a: p, b: p, color, width }),
+                Tool::Ellipse => st.current = Some(Shape::Ellipse { a: p, b: p, color, width }),
                 Tool::Arrow => st.current = Some(Shape::Arrow { a: p, b: p, color, width }),
                 Tool::Pen => st.current = Some(Shape::Pen { points: vec![p], color, width }),
                 Tool::Text => {
@@ -672,8 +697,15 @@ fn build_ui(app: &adw::Application) {
             let Some((sx, sy)) = g.start_point() else { return };
             let mut st = state.borrow_mut();
             let p = st.to_image(sx + dx, sy + dy);
+            let shift = g.current_event_state().contains(gdk::ModifierType::SHIFT_MASK);
             match &mut st.current {
                 Some(Shape::Rect { b, .. }) | Some(Shape::Arrow { b, .. }) => *b = p,
+                // Shift turns the bounding box into a square, so the ellipse is a circle.
+                Some(Shape::Ellipse { a, b, .. }) if shift => {
+                    let side = (p.0 - a.0).abs().max((p.1 - a.1).abs());
+                    *b = (a.0 + side.copysign(p.0 - a.0), a.1 + side.copysign(p.1 - a.1));
+                }
+                Some(Shape::Ellipse { b, .. }) => *b = p,
                 Some(Shape::Pen { points, .. }) => points.push(p),
                 _ => {}
             }
@@ -816,9 +848,10 @@ fn build_ui(app: &adw::Application) {
                 (gdk::Key::z, true, false) => undo(),
                 (gdk::Key::v, true, _) => load_clipboard(),
                 (gdk::Key::r, false, _) => tool_buttons[0].set_active(true),
-                (gdk::Key::a, false, _) => tool_buttons[1].set_active(true),
-                (gdk::Key::p, false, _) => tool_buttons[2].set_active(true),
-                (gdk::Key::t, false, _) => tool_buttons[3].set_active(true),
+                (gdk::Key::c, false, _) => tool_buttons[1].set_active(true),
+                (gdk::Key::a, false, _) => tool_buttons[2].set_active(true),
+                (gdk::Key::p, false, _) => tool_buttons[3].set_active(true),
+                (gdk::Key::t, false, _) => tool_buttons[4].set_active(true),
                 (gdk::Key::_1, false, _) => size_buttons[0].set_active(true),
                 (gdk::Key::_2, false, _) => size_buttons[1].set_active(true),
                 (gdk::Key::_3, false, _) => size_buttons[2].set_active(true),
