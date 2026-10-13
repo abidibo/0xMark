@@ -9,7 +9,7 @@
 #
 # Environment:
 #   OXMARK_HOTKEY='<Super><Shift>a'   shortcut to bind, empty to skip it
-#   OXMARK_VERSION=latest             release tag to install, for example v0.1.0
+#   OXMARK_VERSION=latest             release tag to install, for example 1.1.0
 #   OXMARK_FROM_SOURCE=1              build from source instead of downloading a binary
 #   OXMARK_RELEASES=<url>             where to download releases from, for mirrors and testing
 set -euo pipefail

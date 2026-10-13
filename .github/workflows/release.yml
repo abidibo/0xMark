@@ -1,10 +1,10 @@
-# Push a tag like v0.2.0 to build Linux binaries and publish them as a GitHub release.
-# The tag must match the version in Cargo.toml.
+# Push a tag like 1.2.0 to build Linux binaries and publish them as a GitHub release.
+# The tag must match the version in Cargo.toml, without a "v" prefix.
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
   contents: write
@@ -26,7 +26,7 @@ jobs:
       - name: Check the tag matches Cargo.toml
         run: |
           version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match version $version in Cargo.toml"
             exit 1
           fi
@@ -72,4 +72,4 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes 0xmark-*
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Release $GITHUB_REF_NAME" --generate-notes 0xmark-*

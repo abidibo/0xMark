@@ -54,7 +54,7 @@ Other options:
 | Variable | Effect |
 |---|---|
 | `OXMARK_HOTKEY='<Super><Shift>m'` | Bind another shortcut. Empty skips the shortcut. |
-| `OXMARK_VERSION=v0.1.0` | Install a specific release instead of the latest. |
+| `OXMARK_VERSION=1.1.0` | Install a specific release instead of the latest. |
 | `OXMARK_FROM_SOURCE=1` | Build from source even when a binary is available. |
 
 From a clone, `./install.sh` always builds and installs that checkout.
@@ -168,11 +168,11 @@ Pushing a tag builds the binaries and publishes the release through GitHub Actio
 (`.github/workflows/release.yml`):
 
 1. Set the new `version` in `Cargo.toml`, run `cargo build` to update `Cargo.lock`, and commit.
-2. Tag and push, using the same version with a `v` prefix:
+2. Tag and push, using the same version with no `v` prefix:
 
    ```sh
-   git tag v0.2.0
-   git push origin main v0.2.0
+   git tag 1.2.0
+   git push origin main 1.2.0
    ```
 
 The workflow stops if the tag and `Cargo.toml` disagree. The installer picks up the new release
