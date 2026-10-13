@@ -24,13 +24,20 @@ curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | ba
 
 The script:
 
-1. installs the system packages it needs with `apt`, `dnf` or `pacman`, asking for your password
-   only when something is missing
-2. installs Rust with [rustup](https://rustup.rs) if you don't have a recent enough version. It
-   doesn't change your default toolchain if you already use rustup
-3. downloads and builds 0xMark
-4. installs the binary to `~/.local/bin/0xmark` and adds 0xMark to the GNOME app grid
-5. binds **Super+Shift+A** to open 0xMark, unless that shortcut is already taken
+1. installs GTK, libadwaita and `wl-clipboard` with `apt`, `dnf` or `pacman` if they are missing.
+   It asks for your password only then. A GNOME desktop usually has all of them except
+   `wl-clipboard`
+2. downloads the prebuilt binary from the [latest release](https://github.com/abidibo/0xMark/releases/latest)
+   for your processor, x86_64 or ARM64, and checks its SHA-256 checksum
+3. installs it to `~/.local/bin/0xmark` and adds 0xMark to the GNOME app grid
+4. binds **Super+Shift+A** to open 0xMark, unless that shortcut is already taken
+
+It takes a few seconds and needs no Rust.
+
+If no binary fits your system, the script builds 0xMark from source instead. It installs the
+build packages and, if your Rust is missing or older than 1.85, installs Rust with
+[rustup](https://rustup.rs). If you already use rustup, it leaves your default toolchain alone.
+The build takes a minute or two.
 
 Run it again to update. Pick another key with `OXMARK_HOTKEY`, or pass an empty value to skip
 the shortcut:
@@ -42,7 +49,15 @@ curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | OX
 You can change the shortcut later in **Settings > Keyboard > View and Customize Shortcuts >
 Custom Shortcuts**.
 
-From a clone, `./install.sh` builds and installs that checkout instead of downloading one.
+Other options:
+
+| Variable | Effect |
+|---|---|
+| `OXMARK_HOTKEY='<Super><Shift>m'` | Bind another shortcut. Empty skips the shortcut. |
+| `OXMARK_VERSION=v0.1.0` | Install a specific release instead of the latest. |
+| `OXMARK_FROM_SOURCE=1` | Build from source even when a binary is available. |
+
+From a clone, `./install.sh` always builds and installs that checkout.
 
 ### Requirements
 
@@ -50,8 +65,9 @@ From a clone, `./install.sh` builds and installs that checkout instead of downlo
 - GTK 4.14 or newer and libadwaita 1.5 or newer. Ubuntu 24.04, Pop!\_OS 24.04 and Fedora 40 or
   newer have these. Ubuntu 22.04 does not.
 - `wl-clipboard`, which provides the `wl-copy` command.
-- Rust 1.85 or newer to build it.
+- Rust 1.85 or newer, only to build from source.
 
+The prebuilt binaries are built on Ubuntu 24.04, so they run on it and on newer distributions.
 The installer takes care of everything except the session and the distribution version.
 
 ### Manual install
@@ -143,6 +159,22 @@ curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | ba
 
 Or `./install.sh --uninstall` from a clone. This removes the binary, the app grid entry, the icon
 and the shortcut. System packages and Rust stay installed.
+
+## Releasing
+
+Pushing a tag builds the binaries and publishes the release through GitHub Actions
+(`.github/workflows/release.yml`):
+
+1. Set the new `version` in `Cargo.toml`, run `cargo build` to update `Cargo.lock`, and commit.
+2. Tag and push, using the same version with a `v` prefix:
+
+   ```sh
+   git tag v0.2.0
+   git push origin main v0.2.0
+   ```
+
+The workflow stops if the tag and `Cargo.toml` disagree. The installer picks up the new release
+right away.
 
 ## How it works
 
