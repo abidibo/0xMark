@@ -1,6 +1,7 @@
 # 0xMark
 
-A tiny GNOME app for marking up images on the clipboard.
+A tiny Linux app for marking up images on the clipboard. Built with GTK 4 and libadwaita, it
+fits GNOME best but runs on any desktop, on Wayland or X11.
 
 Copy an image, open 0xMark, draw a box or an arrow, press `Enter`. The annotated image is back on
 the clipboard, ready to paste into chat, email, an issue tracker or a document.
@@ -14,7 +15,7 @@ the clipboard, ready to paste into chat, email, an issue tracker or a document.
 - Seven colours and three stroke sizes.
 - Undo and redo.
 - Exports at the original resolution, whatever the zoom level in the window.
-- Follows the GNOME light or dark style.
+- Follows the system light or dark style.
 
 ## Install
 
@@ -24,13 +25,14 @@ curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | ba
 
 The script:
 
-1. installs GTK, libadwaita and `wl-clipboard` with `apt`, `dnf` or `pacman` if they are missing.
-   It asks for your password only then. A GNOME desktop usually has all of them except
-   `wl-clipboard`
+1. installs GTK, libadwaita and a clipboard helper with `apt`, `dnf` or `pacman` if they are
+   missing: `wl-clipboard` on Wayland, `xclip` on X11. It asks for your password only then. A
+   GNOME desktop usually has all of them except the clipboard helper
 2. downloads the prebuilt binary from the [latest release](https://github.com/abidibo/0xMark/releases/latest)
    for your processor, x86_64 or ARM64, and checks its SHA-256 checksum
-3. installs it to `~/.local/bin/0xmark` and adds 0xMark to the GNOME app grid
-4. binds **Super+Shift+A** to open 0xMark, unless that shortcut is already taken
+3. installs it to `~/.local/bin/0xmark` and adds 0xMark to your app launcher
+4. on GNOME, binds **Super+Shift+A** to open 0xMark, unless that shortcut is already taken.
+   On other desktops, bind a key yourself, see [Manual install](#manual-install)
 
 It takes a few seconds and needs no Rust.
 
@@ -46,14 +48,18 @@ the shortcut:
 curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | OXMARK_HOTKEY='<Super><Shift>m' bash
 ```
 
-You can change the shortcut later in **Settings > Keyboard > View and Customize Shortcuts >
+On GNOME you can change the shortcut later in **Settings > Keyboard > View and Customize Shortcuts >
 Custom Shortcuts**.
+
+Rather not spend a shortcut on it? [Parsec](https://github.com/abidibo/parsec), a GNOME launcher
+by the same author, finds 0xMark as soon as it is installed: press the Parsec key, type `0xmark`
+and press `Enter`.
 
 Other options:
 
 | Variable | Effect |
 |---|---|
-| `OXMARK_HOTKEY='<Super><Shift>m'` | Bind another shortcut. Empty skips the shortcut. |
+| `OXMARK_HOTKEY='<Super><Shift>m'` | Bind another GNOME shortcut. Empty skips the shortcut. |
 | `OXMARK_VERSION=1.1.0` | Install a specific release instead of the latest. |
 | `OXMARK_FROM_SOURCE=1` | Build from source even when a binary is available. |
 
@@ -61,19 +67,20 @@ From a clone, `./install.sh` always builds and installs that checkout.
 
 ### Requirements
 
-- Linux with a **GNOME Wayland** session. X11 sessions are not supported.
+- Linux with a Wayland or X11 session. GNOME, KDE Plasma, Sway, Hyprland and others all work;
+  only the installer's keyboard shortcut is GNOME-specific.
 - GTK 4.14 or newer and libadwaita 1.5 or newer. Ubuntu 24.04, Pop!\_OS 24.04 and Fedora 40 or
   newer have these. Ubuntu 22.04 does not.
-- `wl-clipboard`, which provides the `wl-copy` command.
+- `wl-clipboard` on Wayland, which provides the `wl-copy` command, or `xclip` on X11.
 - Rust 1.85 or newer, only to build from source.
 
 The prebuilt binaries are built on Ubuntu 24.04, so they run on it and on newer distributions.
-The installer takes care of everything except the session and the distribution version.
+The installer takes care of everything except the distribution version.
 
 ### Manual install
 
 If you'd rather run each step yourself, install the build dependencies and Rust. On Ubuntu,
-Pop!\_OS or Debian:
+Pop!\_OS or Debian, on Wayland:
 
 ```sh
 sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev wl-clipboard curl && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && . ~/.cargo/env
@@ -81,7 +88,7 @@ sudo apt install build-essential pkg-config libgtk-4-dev libadwaita-1-dev wl-cli
 
 On Fedora, `sudo dnf install gcc pkgconf-pkg-config gtk4-devel libadwaita-devel wl-clipboard`. On
 Arch, `sudo pacman -S base-devel gtk4 libadwaita wl-clipboard`. Then install Rust with the
-`curl` command above.
+`curl` command above. On X11, install `xclip` instead of `wl-clipboard`.
 
 Build and install:
 
@@ -98,20 +105,24 @@ sed "s|^Exec=0xmark$|Exec=$HOME/.local/bin/0xmark|" data/dev.abidibo.OxMark.desk
   > ~/.local/share/applications/dev.abidibo.OxMark.desktop
 ```
 
-The `sed` line writes the full path of the binary into the desktop entry. Some GNOME sessions do
-not have `~/.local/bin` on their `PATH`, and GNOME silently hides desktop entries whose program it
-cannot find. The `touch` line tells running apps, such as GNOME Shell or a launcher, to
-reload icons.
+The `sed` line writes the full path of the binary into the desktop entry. Some sessions do not
+have `~/.local/bin` on their `PATH`, and desktops such as GNOME silently hide entries whose
+program they cannot find. The `touch` line tells running apps, such as GNOME Shell or a
+launcher, to reload icons.
 
-Then bind a key: open **Settings > Keyboard > View and Customize Shortcuts > Custom Shortcuts**
-and add a shortcut named `0xMark`. For the command, use the full path, which
-`echo ~/.local/bin/0xmark` prints. Pick a combination such as `Super+Shift+A`.
+Then bind a key. On GNOME, open **Settings > Keyboard > View and Customize Shortcuts > Custom
+Shortcuts** and add a shortcut named `0xMark`. On KDE Plasma, use **System Settings > Keyboard >
+Shortcuts > Add New > Command or Script**. On Sway or Hyprland, add a `bindsym` or `bind` line to
+your config. In every case, use the full path for the command, which `echo ~/.local/bin/0xmark`
+prints, and pick a combination such as `Super+Shift+A`.
 
 ## Usage
 
-1. Copy an image. For a screenshot, press `Print`, select an area and confirm. GNOME puts the
-   screenshot on the clipboard. Copying an image from a browser or an image viewer works too.
-2. Open 0xMark with your shortcut, `Super+Shift+A` by default. The image appears right away.
+1. Copy an image. For a screenshot on GNOME, press `Print`, select an area and confirm. GNOME
+   puts the screenshot on the clipboard. Other desktops' screenshot tools have a similar copy
+   option. Copying an image from a browser or an image viewer works too.
+2. Open 0xMark with your shortcut, `Super+Shift+A` by default on GNOME, or from a launcher such
+   as [Parsec](https://github.com/abidibo/parsec). The image appears right away.
 3. Pick a tool, a colour and a size in the toolbar at the bottom, then drag on the image.
    Hold `Shift` while dragging a circle to keep it round. For text, click where the label should
    go, type it and press `Enter`.
@@ -138,20 +149,18 @@ Press `Esc` to close without touching the clipboard.
 
 ## Troubleshooting
 
-**0xMark is missing from the app grid or your launcher.** The desktop entry probably still says
+**0xMark is missing from your app launcher.** The desktop entry probably still says
 `Exec=0xmark` and your session cannot find it. Run the installer again, or repeat the `sed` step
 from the manual install.
 
 **"No image in clipboard".** The clipboard holds text or nothing. Copy an image and press
 `Ctrl+V` in the window.
 
-**"cannot run wl-copy".** Install `wl-clipboard`, or run the installer again.
+**"cannot run wl-copy" or "cannot run xclip".** Install `wl-clipboard` on Wayland or `xclip` on
+X11, or run the installer again from that session.
 
 **The installer says GTK 4.14 or newer is required.** Your distribution is too old. Ubuntu 22.04
 ships GTK 4.6; upgrade to 24.04 or newer.
-
-**The pasted image is empty or the paste fails.** You are probably in an X11 session. Check with
-`echo $XDG_SESSION_TYPE`. It must print `wayland`.
 
 ## Uninstall
 
@@ -159,8 +168,8 @@ ships GTK 4.6; upgrade to 24.04 or newer.
 curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | bash -s -- --uninstall
 ```
 
-Or `./install.sh --uninstall` from a clone. This removes the binary, the app grid entry, the icon
-and the shortcut. System packages and Rust stay installed.
+Or `./install.sh --uninstall` from a clone. This removes the binary, the app launcher entry, the
+icon and the GNOME shortcut. System packages and Rust stay installed.
 
 ## Releasing
 
@@ -184,9 +193,9 @@ right away.
 draws annotations with Cairo. Annotations are kept in image coordinates, so the preview can be
 scaled freely while the export stays at full resolution.
 
-On Wayland, clipboard content belongs to the app that copied it and disappears when that app
-quits. 0xMark therefore hands the final PNG to `wl-copy`, which keeps serving it in the background
-after 0xMark has closed.
+On Linux, clipboard content belongs to the app that copied it and disappears when that app quits.
+0xMark therefore hands the final PNG to `wl-copy` on Wayland or `xclip` on X11, which keeps serving
+it in the background after 0xMark has closed.
 
 ## License
 

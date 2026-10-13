@@ -270,23 +270,30 @@ fn texture_to_surface(tex: &gdk::Texture) -> Option<cairo::ImageSurface> {
     cairo::ImageSurface::create_for_data(data, cairo::Format::ARgb32, w, h, stride).ok()
 }
 
+/// Hand the PNG to a helper that keeps serving it after 0xMark quits: wl-copy on Wayland,
+/// xclip on X11. Both read stdin, then fork into the background.
 fn copy_to_clipboard(png: &[u8]) -> Result<(), String> {
-    let mut child = Command::new("wl-copy")
-        .args(["--type", "image/png"])
+    let (cmd, args): (&str, &[&str]) = if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        ("wl-copy", &["--type", "image/png"])
+    } else {
+        ("xclip", &["-selection", "clipboard", "-target", "image/png", "-in"])
+    };
+    let mut child = Command::new(cmd)
+        .args(args)
         .stdin(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("cannot run wl-copy: {e}"))?;
+        .map_err(|e| format!("cannot run {cmd}: {e}"))?;
     child
         .stdin
         .take()
-        .ok_or("wl-copy stdin unavailable")?
+        .ok_or(format!("{cmd} stdin unavailable"))?
         .write_all(png)
-        .map_err(|e| format!("cannot write to wl-copy: {e}"))?;
-    let status = child.wait().map_err(|e| format!("wl-copy: {e}"))?;
+        .map_err(|e| format!("cannot write to {cmd}: {e}"))?;
+    let status = child.wait().map_err(|e| format!("{cmd}: {e}"))?;
     if status.success() {
         Ok(())
     } else {
-        Err(format!("wl-copy exited with {status}"))
+        Err(format!("{cmd} exited with {status}"))
     }
 }
 

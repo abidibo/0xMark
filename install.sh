@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install 0xMark into ~/.local: the prebuilt binary from the latest GitHub release, the desktop
-# entry, the icon and a GNOME keyboard shortcut. Builds from source, installing Rust through
+# entry, the icon and, on GNOME, a keyboard shortcut. Builds from source, installing Rust through
 # rustup if needed, when no prebuilt binary fits this system.
 #
 #   curl -fsSL https://raw.githubusercontent.com/abidibo/0xMark/main/install.sh | bash
@@ -8,7 +8,7 @@
 #   ./install.sh --uninstall     removes everything the installer added
 #
 # Environment:
-#   OXMARK_HOTKEY='<Super><Shift>a'   shortcut to bind, empty to skip it
+#   OXMARK_HOTKEY='<Super><Shift>a'   GNOME shortcut to bind, empty to skip it
 #   OXMARK_VERSION=latest             release tag to install, for example 1.1.0
 #   OXMARK_FROM_SOURCE=1              build from source instead of downloading a binary
 #   OXMARK_RELEASES=<url>             where to download releases from, for mirrors and testing
@@ -39,11 +39,17 @@ as_root() {
   if [[ $EUID -eq 0 ]]; then "$@"; else sudo "$@"; fi
 }
 
+# The helper that keeps the copied image on the clipboard after 0xMark quits.
+clipboard_pkg() {
+  if [[ ${XDG_SESSION_TYPE:-} == "x11" ]]; then echo xclip; else echo wl-clipboard; fi
+}
+
 # install_packages runtime|build
 install_packages() {
-  local kind="$1" pkgs=() missing=() p
+  local kind="$1" pkgs=() missing=() p clip
+  clip="$(clipboard_pkg)"
   if have apt-get; then
-    pkgs=(libgtk-4-1 libadwaita-1-0 wl-clipboard curl)
+    pkgs=(libgtk-4-1 libadwaita-1-0 "$clip" curl)
     [[ $kind == build ]] && pkgs+=(build-essential pkg-config libgtk-4-dev libadwaita-1-dev)
     for p in "${pkgs[@]}"; do
       dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q "ok installed" || missing+=("$p")
@@ -54,7 +60,7 @@ install_packages() {
       as_root apt-get install -y "${missing[@]}"
     fi
   elif have dnf; then
-    pkgs=(gtk4 libadwaita wl-clipboard curl)
+    pkgs=(gtk4 libadwaita "$clip" curl)
     [[ $kind == build ]] && pkgs+=(gcc pkgconf-pkg-config gtk4-devel libadwaita-devel)
     for p in "${pkgs[@]}"; do
       rpm -q "$p" >/dev/null 2>&1 || missing+=("$p")
@@ -64,7 +70,7 @@ install_packages() {
       as_root dnf install -y "${missing[@]}"
     fi
   elif have pacman; then
-    pkgs=(gtk4 libadwaita wl-clipboard curl)
+    pkgs=(gtk4 libadwaita "$clip" curl)
     [[ $kind == build ]] && pkgs+=(base-devel)
     for p in "${pkgs[@]}"; do
       pacman -Qi "$p" >/dev/null 2>&1 || missing+=("$p")
@@ -74,7 +80,7 @@ install_packages() {
       as_root pacman -S --needed --noconfirm "${missing[@]}"
     fi
   else
-    warn "Unknown package manager. Install GTK 4.14+, libadwaita 1.5+ and wl-clipboard yourself."
+    warn "Unknown package manager. Install GTK 4.14+, libadwaita 1.5+ and $clip yourself."
   fi
 
   [[ $kind == build ]] || return 0
@@ -195,7 +201,7 @@ has_gnome_keys() {
 bind_hotkey() {
   [[ -n $HOTKEY ]] || return 0
   if ! has_gnome_keys; then
-    warn "GNOME settings not found, skipping the keyboard shortcut."
+    warn "Not GNOME, skipping the keyboard shortcut. Bind one to $BIN in your desktop's settings."
     return 0
   fi
 
@@ -245,9 +251,6 @@ main() {
     return
   fi
 
-  [[ ${XDG_SESSION_TYPE:-} == "wayland" ]] ||
-    warn "This is not a Wayland session. 0xMark needs GNOME on Wayland to copy images back."
-
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
 
@@ -265,7 +268,7 @@ main() {
   install -Dm755 "$FILES/0xmark" "$BIN"
   install -Dm644 "$FILES/$APP_ID.svg" "$ICON"
   mkdir -p "$(dirname "$DESKTOP")"
-  # Absolute path: GNOME hides entries whose program is not on its PATH.
+  # Absolute path: GNOME and other desktops hide entries whose program is not on their PATH.
   sed "s|^Exec=0xmark$|Exec=$BIN|" "$FILES/$APP_ID.desktop" >"$DESKTOP"
   touch "$ICON_DIR"
   have update-desktop-database && update-desktop-database -q "$(dirname "$DESKTOP")" 2>/dev/null || true
@@ -273,12 +276,12 @@ main() {
   BOUND=0
   bind_hotkey
 
-  say "0xMark is installed. Find it in the app grid."
+  say "0xMark is installed. Find it in your app launcher."
   if ((BOUND)); then
     say "Shortcut: $HOTKEY. Change it in Settings > Keyboard > Custom Shortcuts."
   fi
   [[ ":$PATH:" == *":$HOME/.local/bin:"* ]] ||
-    warn "~/.local/bin is not on your PATH, so '0xmark' won't run from a terminal. The app grid and the shortcut are not affected."
+    warn "~/.local/bin is not on your PATH, so '0xmark' won't run from a terminal. The app launcher and the shortcut are not affected."
 }
 
 # Everything runs from main, so a download cut short by the network never runs half a script.
