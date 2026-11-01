@@ -5,6 +5,7 @@ use std::f64::consts::{PI, TAU};
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
+use std::time::Duration;
 
 use adw::prelude::*;
 use gtk::{cairo, gdk, gio, glib};
@@ -876,14 +877,38 @@ fn build_ui(app: &adw::Application) {
     window.set_content(Some(&view));
 
     // On Wayland the clipboard offer arrives once the window has keyboard focus,
-    // so load on first activation rather than right away.
+    // so load on first activation rather than right away. Some compositors send
+    // the offer only after activation: if no image is there yet, wait briefly
+    // for the clipboard to change before giving up.
     let loaded = Rc::new(Cell::new(false));
     {
         let load_clipboard = load_clipboard.clone();
         window.connect_is_active_notify(move |w| {
-            if w.is_active() && !loaded.replace(true) {
-                load_clipboard();
+            if !w.is_active() || loaded.replace(true) {
+                return;
             }
+            let clipboard = w.clipboard();
+            if clipboard.formats().contains_type(gdk::Texture::static_type()) {
+                load_clipboard();
+                return;
+            }
+            let handler = Rc::new(RefCell::new(None));
+            let load_once: Rc<dyn Fn()> = {
+                let handler = handler.clone();
+                let clipboard = clipboard.clone();
+                let load_clipboard = load_clipboard.clone();
+                Rc::new(move || {
+                    if let Some(id) = handler.borrow_mut().take() {
+                        clipboard.disconnect(id);
+                        load_clipboard();
+                    }
+                })
+            };
+            {
+                let load_once = load_once.clone();
+                *handler.borrow_mut() = Some(clipboard.connect_changed(move |_| load_once()));
+            }
+            glib::timeout_add_local_once(Duration::from_millis(500), move || load_once());
         });
     }
 
