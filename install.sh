@@ -198,9 +198,14 @@ has_gnome_keys() {
   have gsettings && gsettings list-schemas | grep -Fx "$SCHEMA" >/dev/null
 }
 
+# Other desktops, such as COSMIC, may ship the GNOME schemas without reading them.
+is_gnome() {
+  [[ ${XDG_CURRENT_DESKTOP:-} == *GNOME* ]] && has_gnome_keys
+}
+
 bind_hotkey() {
   [[ -n $HOTKEY ]] || return 0
-  if ! has_gnome_keys; then
+  if ! is_gnome; then
     warn "Not GNOME, skipping the keyboard shortcut. Bind one to $BIN in your desktop's settings."
     return 0
   fi
