@@ -11,7 +11,7 @@ the clipboard, ready to paste into chat, email, an issue tracker or a document.
 ## Features
 
 - Loads the clipboard image automatically when the window opens.
-- Rectangles, circles and ellipses, arrows, freehand pen and text labels.
+- Rectangles, circles and ellipses, polygons, arrows, freehand pen and text labels.
 - Seven colours and three stroke sizes.
 - Undo and redo.
 - Exports at the original resolution, whatever the zoom level in the window.
@@ -124,8 +124,9 @@ prints, and pick a combination such as `Super+Shift+A`.
 2. Open 0xMark with your shortcut, `Super+Shift+A` by default on GNOME, or from a launcher such
    as [Parsec](https://github.com/abidibo/parsec). The image appears right away.
 3. Pick a tool, a colour and a size in the toolbar at the bottom, then drag on the image.
-   Hold `Shift` while dragging a circle to keep it round. For text, click where the label should
-   go, type it and press `Enter`.
+   Hold `Shift` while dragging a circle to keep it round. For a polygon, click each corner, then
+   click the first corner again or press `Enter` to close it. For text, click where the label
+   should go, type it and press `Enter`.
 4. Press `Enter` or click **Copy**. 0xMark closes and the annotated PNG is on the clipboard.
 5. Paste it wherever you need it.
 
@@ -137,6 +138,7 @@ Press `Esc` to close without touching the clipboard.
 |--------------------|----------------------------------------------------------|
 | `R`                | Rectangle                                                |
 | `C`                | Circle, hold `Shift` while dragging for a perfect circle |
+| `G`                | Polygon, see below                                       |
 | `A`                | Arrow                                                    |
 | `P`                | Freehand pen                                             |
 | `T`                | Text, then click to place                                |
@@ -146,6 +148,10 @@ Press `Esc` to close without touching the clipboard.
 | `Ctrl+V`           | Load the clipboard image again                           |
 | `Enter` / `Ctrl+C` | Copy the result and close                                |
 | `Esc`              | Close without copying                                    |
+
+While drawing a polygon, click to add a corner. Hold `Shift` to keep the next edge at a 45° step.
+Close the shape by clicking the first corner, double-clicking or pressing `Enter`. `Backspace` or
+`Ctrl+Z` removes the last corner, and `Esc` discards the polygon.
 
 ## Troubleshooting
 

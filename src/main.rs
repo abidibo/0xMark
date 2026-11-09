@@ -20,6 +20,7 @@ const APP_ID: &str = "dev.abidibo.OxMark";
 enum Tool {
     Rect,
     Ellipse,
+    Polygon,
     Arrow,
     Pen,
     Text,
@@ -72,6 +73,8 @@ enum Shape {
     /// Fills the box between the two corners.
     Ellipse { a: Point, b: Point, color: Rgb, width: f64 },
     Arrow { a: Point, b: Point, color: Rgb, width: f64 },
+    /// While drawing, `closed` is false and the last point follows the pointer.
+    Polygon { points: Vec<Point>, color: Rgb, width: f64, closed: bool },
     Pen { points: Vec<Point>, color: Rgb, width: f64 },
     Text { at: Point, text: String, color: Rgb, size: f64 },
 }
@@ -132,6 +135,73 @@ impl State {
         self.shapes.push(shape);
         self.redo.clear();
     }
+
+    /// How close a click must land to a vertex to hit it: 12 screen pixels.
+    fn snap_tolerance(&self) -> f64 {
+        12.0 / self.scale
+    }
+
+    fn drawing_polygon(&self) -> bool {
+        matches!(self.current, Some(Shape::Polygon { .. }))
+    }
+
+    fn polygon(&mut self) -> Option<&mut Vec<Point>> {
+        match &mut self.current {
+            Some(Shape::Polygon { points, .. }) => Some(points),
+            _ => None,
+        }
+    }
+
+    /// Where the next polygon vertex goes for a pointer at `p`: on the first vertex when the
+    /// pointer is close enough to close the shape, else in 45° steps when Shift is held.
+    fn polygon_cursor(&self, p: Point, shift: bool) -> Point {
+        let Some(Shape::Polygon { points, .. }) = &self.current else { return p };
+        let placed = &points[..points.len() - 1];
+        if placed.len() >= 3 && dist(p, placed[0]) < self.snap_tolerance() {
+            return placed[0];
+        }
+        match placed.last() {
+            Some(&last) if shift => snap_45(last, p),
+            _ => p,
+        }
+    }
+
+    /// Removes the last vertex placed, and the whole polygon once none is left.
+    fn polygon_undo(&mut self) {
+        let Some(points) = self.polygon() else { return };
+        let n = points.len();
+        if n <= 2 {
+            self.current = None;
+        } else {
+            points.remove(n - 2);
+        }
+    }
+
+    /// Closes the polygon being drawn. One with fewer than three vertices is dropped.
+    fn finish_polygon(&mut self) {
+        if !self.drawing_polygon() {
+            return;
+        }
+        if let Some(Shape::Polygon { mut points, color, width, .. }) = self.current.take() {
+            points.pop();
+            if points.len() >= 3 {
+                self.push(Shape::Polygon { points, color, width, closed: true });
+            }
+        }
+    }
+}
+
+fn dist(a: Point, b: Point) -> f64 {
+    (a.0 - b.0).hypot(a.1 - b.1)
+}
+
+/// `to`, moved onto the nearest 45° line through `from`.
+fn snap_45(from: Point, to: Point) -> Point {
+    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+    let step = PI / 4.0;
+    let angle = (dy.atan2(dx) / step).round() * step;
+    let len = dx.hypot(dy);
+    (from.0 + len * angle.cos(), from.1 + len * angle.sin())
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +277,25 @@ fn draw_shape(cr: &cairo::Context, shape: &Shape) {
             let _ = cr.fill_preserve();
             cr.set_line_width(width * 0.5);
             let _ = cr.stroke();
+        }
+        Shape::Polygon { points, color, width, closed } => {
+            let Some((first, rest)) = points.split_first() else { return };
+            color.set(cr);
+            cr.set_line_width(*width);
+            cr.move_to(first.0, first.1);
+            for p in rest {
+                cr.line_to(p.0, p.1);
+            }
+            if *closed {
+                cr.close_path();
+            }
+            let _ = cr.stroke();
+            // While drawing, ring the first vertex when the next click would close the shape.
+            if !*closed && points.len() >= 4 && points.last() == Some(first) {
+                cr.set_line_width(width * 0.5);
+                cr.arc(first.0, first.1, width * 1.75, 0.0, TAU);
+                let _ = cr.stroke();
+            }
         }
         Shape::Pen { points, color, width } => {
             color.set(cr);
@@ -329,6 +418,15 @@ fn glyph(kind: Glyph) -> gtk::DrawingArea {
             }
             Glyph::Tool(Tool::Ellipse) => {
                 cr.arc(9.0, 9.0, 6.5, 0.0, TAU);
+                let _ = cr.stroke();
+            }
+            Glyph::Tool(Tool::Polygon) => {
+                cr.move_to(3.0, 14.5);
+                cr.line_to(2.5, 6.0);
+                cr.line_to(9.5, 2.5);
+                cr.line_to(15.5, 7.5);
+                cr.line_to(12.5, 15.0);
+                cr.close_path();
                 let _ = cr.stroke();
             }
             Glyph::Tool(Tool::Arrow) => {
@@ -513,20 +611,73 @@ fn build_ui(app: &adw::Application) {
         .description("Copy an image, then press Ctrl+V")
         .build();
 
+    // --- header bar --------------------------------------------------------
+    let title = adw::WindowTitle::new("0xMark", "");
+    let header = adw::HeaderBar::new();
+    header.set_title_widget(Some(&title));
+
+    let undo_button = gtk::Button::builder()
+        .icon_name("edit-undo-symbolic")
+        .tooltip_text("Undo  (Ctrl+Z)")
+        .sensitive(false)
+        .build();
+    let redo_button = gtk::Button::builder()
+        .icon_name("edit-redo-symbolic")
+        .tooltip_text("Redo  (Ctrl+Shift+Z)")
+        .sensitive(false)
+        .build();
+    header.pack_start(&undo_button);
+    header.pack_start(&redo_button);
+
+    let copy_button = gtk::Button::builder()
+        .child(&adw::ButtonContent::builder().icon_name("edit-copy-symbolic").label("Copy").build())
+        .tooltip_text("Copy to clipboard and close  (Enter)")
+        .sensitive(false)
+        .build();
+    copy_button.add_css_class("suggested-action");
+    header.pack_end(&copy_button);
+
+    // Redraw and refresh button sensitivity after any change to the shapes.
+    let changed: Rc<dyn Fn()> = {
+        let state = state.clone();
+        let area = area.clone();
+        let undo_button = undo_button.clone();
+        let redo_button = redo_button.clone();
+        let copy_button = copy_button.clone();
+        Rc::new(move || {
+            let st = state.borrow();
+            undo_button.set_sensitive(!st.shapes.is_empty() || st.drawing_polygon());
+            redo_button.set_sensitive(!st.redo.is_empty());
+            copy_button.set_sensitive(st.image.is_some());
+            area.queue_draw();
+        })
+    };
+
     // --- floating toolbar --------------------------------------------------
     let (tools_box, tool_buttons) = {
         let state = state.clone();
         let area = area.clone();
+        let changed = changed.clone();
         toggle_group(
             &[
                 (Tool::Rect, Glyph::Tool(Tool::Rect), "Rectangle  (R)".to_string()),
                 (Tool::Ellipse, Glyph::Tool(Tool::Ellipse), "Circle  (C, hold Shift for a perfect circle)".to_string()),
+                (
+                    Tool::Polygon,
+                    Glyph::Tool(Tool::Polygon),
+                    "Polygon  (G, click each corner, click the first one or press Enter to close)".to_string(),
+                ),
                 (Tool::Arrow, Glyph::Tool(Tool::Arrow), "Arrow  (A)".to_string()),
                 (Tool::Pen, Glyph::Tool(Tool::Pen), "Pen  (P)".to_string()),
                 (Tool::Text, Glyph::Tool(Tool::Text), "Text  (T)".to_string()),
             ],
             move |tool| {
-                state.borrow_mut().tool = tool;
+                let mut st = state.borrow_mut();
+                // Switching tools keeps a polygon in progress, closed.
+                st.finish_polygon();
+                st.tool = tool;
+                drop(st);
+                changed();
                 area.set_cursor_from_name(Some(if tool == Tool::Text { "text" } else { "crosshair" }));
             },
         )
@@ -596,48 +747,6 @@ fn build_ui(app: &adw::Application) {
     let toasts = adw::ToastOverlay::new();
     toasts.set_child(Some(&stack));
 
-    // --- header bar --------------------------------------------------------
-    let title = adw::WindowTitle::new("0xMark", "");
-    let header = adw::HeaderBar::new();
-    header.set_title_widget(Some(&title));
-
-    let undo_button = gtk::Button::builder()
-        .icon_name("edit-undo-symbolic")
-        .tooltip_text("Undo  (Ctrl+Z)")
-        .sensitive(false)
-        .build();
-    let redo_button = gtk::Button::builder()
-        .icon_name("edit-redo-symbolic")
-        .tooltip_text("Redo  (Ctrl+Shift+Z)")
-        .sensitive(false)
-        .build();
-    header.pack_start(&undo_button);
-    header.pack_start(&redo_button);
-
-    let copy_button = gtk::Button::builder()
-        .child(&adw::ButtonContent::builder().icon_name("edit-copy-symbolic").label("Copy").build())
-        .tooltip_text("Copy to clipboard and close  (Enter)")
-        .sensitive(false)
-        .build();
-    copy_button.add_css_class("suggested-action");
-    header.pack_end(&copy_button);
-
-    // Redraw and refresh button sensitivity after any change to the shapes.
-    let changed: Rc<dyn Fn()> = {
-        let state = state.clone();
-        let area = area.clone();
-        let undo_button = undo_button.clone();
-        let redo_button = redo_button.clone();
-        let copy_button = copy_button.clone();
-        Rc::new(move || {
-            let st = state.borrow();
-            undo_button.set_sensitive(!st.shapes.is_empty());
-            redo_button.set_sensitive(!st.redo.is_empty());
-            copy_button.set_sensitive(st.image.is_some());
-            area.queue_draw();
-        })
-    };
-
     // --- text entry popover ------------------------------------------------
     let entry = gtk::Entry::builder()
         .placeholder_text("Type a label, press Enter")
@@ -673,7 +782,7 @@ fn build_ui(app: &adw::Application) {
         let area = area.clone();
         let popover = popover.clone();
         let entry = entry.clone();
-        drag.connect_drag_begin(move |_, x, y| {
+        drag.connect_drag_begin(move |g, x, y| {
             let mut st = state.borrow_mut();
             if st.image.is_none() {
                 return;
@@ -684,6 +793,26 @@ fn build_ui(app: &adw::Application) {
                 Tool::Rect => st.current = Some(Shape::Rect { a: p, b: p, color, width }),
                 Tool::Ellipse => st.current = Some(Shape::Ellipse { a: p, b: p, color, width }),
                 Tool::Arrow => st.current = Some(Shape::Arrow { a: p, b: p, color, width }),
+                Tool::Polygon if !st.drawing_polygon() => {
+                    st.current = Some(Shape::Polygon { points: vec![p, p], color, width, closed: false })
+                }
+                Tool::Polygon => {
+                    let shift = g.current_event_state().contains(gdk::ModifierType::SHIFT_MASK);
+                    let q = st.polygon_cursor(p, shift);
+                    let tol = st.snap_tolerance();
+                    if let Some(points) = st.polygon() {
+                        let n = points.len();
+                        let (first, last) = (points[0], points[n - 2]);
+                        // Clicking the first vertex closes the shape, and so does clicking the
+                        // last one again, which makes a double-click work too.
+                        if (n >= 4 && q == first) || dist(q, last) < tol {
+                            st.finish_polygon();
+                        } else {
+                            points[n - 1] = q;
+                            points.push(q);
+                        }
+                    }
+                }
                 Tool::Pen => st.current = Some(Shape::Pen { points: vec![p], color, width }),
                 Tool::Text => {
                     st.pending_text_at = p;
@@ -706,6 +835,7 @@ fn build_ui(app: &adw::Application) {
             let mut st = state.borrow_mut();
             let p = st.to_image(sx + dx, sy + dy);
             let shift = g.current_event_state().contains(gdk::ModifierType::SHIFT_MASK);
+            let q = st.polygon_cursor(p, shift);
             match &mut st.current {
                 Some(Shape::Rect { b, .. }) | Some(Shape::Arrow { b, .. }) => *b = p,
                 // Shift turns the bounding box into a square, so the ellipse is a circle.
@@ -715,6 +845,11 @@ fn build_ui(app: &adw::Application) {
                 }
                 Some(Shape::Ellipse { b, .. }) => *b = p,
                 Some(Shape::Pen { points, .. }) => points.push(p),
+                Some(Shape::Polygon { points, .. }) => {
+                    if let Some(last) = points.last_mut() {
+                        *last = q;
+                    }
+                }
                 _ => {}
             }
             area.queue_draw();
@@ -725,7 +860,10 @@ fn build_ui(app: &adw::Application) {
         let changed = changed.clone();
         drag.connect_drag_end(move |_, _, _| {
             let mut st = state.borrow_mut();
-            if let Some(s) = st.current.take() {
+            // A polygon stays open across clicks until it is closed.
+            if !st.drawing_polygon()
+                && let Some(s) = st.current.take()
+            {
                 st.push(s);
             }
             drop(st);
@@ -733,6 +871,26 @@ fn build_ui(app: &adw::Application) {
         });
     }
     area.add_controller(drag);
+
+    // The polygon's next edge follows the pointer between clicks.
+    let motion = gtk::EventControllerMotion::new();
+    {
+        let state = state.clone();
+        let area = area.clone();
+        motion.connect_motion(move |c, x, y| {
+            let mut st = state.borrow_mut();
+            if !st.drawing_polygon() {
+                return;
+            }
+            let shift = c.current_event_state().contains(gdk::ModifierType::SHIFT_MASK);
+            let q = st.polygon_cursor(st.to_image(x, y), shift);
+            if let Some(last) = st.polygon().and_then(|points| points.last_mut()) {
+                *last = q;
+            }
+            area.queue_draw();
+        });
+    }
+    area.add_controller(motion);
 
     // --- actions -----------------------------------------------------------
     let load_clipboard: Rc<dyn Fn()> = {
@@ -785,6 +943,7 @@ fn build_ui(app: &adw::Application) {
         let toasts = toasts.clone();
         let app = app.clone();
         Rc::new(move || {
+            state.borrow_mut().finish_polygon();
             let result = render_png(&state.borrow()).and_then(|png| copy_to_clipboard(&png));
             match result {
                 Ok(()) => app.quit(),
@@ -798,7 +957,9 @@ fn build_ui(app: &adw::Application) {
         let changed = changed.clone();
         Rc::new(move || {
             let mut st = state.borrow_mut();
-            if let Some(s) = st.shapes.pop() {
+            if st.drawing_polygon() {
+                st.polygon_undo();
+            } else if let Some(s) = st.shapes.pop() {
                 st.redo.push(s);
             }
             drop(st);
@@ -841,14 +1002,26 @@ fn build_ui(app: &adw::Application) {
         let tool_buttons = tool_buttons.clone();
         let size_buttons = size_buttons.clone();
         let load_clipboard = load_clipboard.clone();
+        let state = state.clone();
+        let changed = changed.clone();
         keys.connect_key_pressed(move |_, key, _, modifier| {
             if popover.is_visible() {
                 return glib::Propagation::Proceed;
             }
+            let drawing = state.borrow().drawing_polygon();
             let ctrl = modifier.contains(gdk::ModifierType::CONTROL_MASK);
             let shift = modifier.contains(gdk::ModifierType::SHIFT_MASK);
             match (key.to_lower(), ctrl, shift) {
+                (gdk::Key::Escape, _, _) if drawing => {
+                    state.borrow_mut().current = None;
+                    changed();
+                }
                 (gdk::Key::Escape, _, _) => window.close(),
+                (gdk::Key::Return | gdk::Key::KP_Enter, _, _) if drawing => {
+                    state.borrow_mut().finish_polygon();
+                    changed();
+                }
+                (gdk::Key::BackSpace, _, _) if drawing => undo(),
                 (gdk::Key::Return | gdk::Key::KP_Enter, _, _) | (gdk::Key::c, true, _) => {
                     copy_and_quit()
                 }
@@ -857,9 +1030,10 @@ fn build_ui(app: &adw::Application) {
                 (gdk::Key::v, true, _) => load_clipboard(),
                 (gdk::Key::r, false, _) => tool_buttons[0].set_active(true),
                 (gdk::Key::c, false, _) => tool_buttons[1].set_active(true),
-                (gdk::Key::a, false, _) => tool_buttons[2].set_active(true),
-                (gdk::Key::p, false, _) => tool_buttons[3].set_active(true),
-                (gdk::Key::t, false, _) => tool_buttons[4].set_active(true),
+                (gdk::Key::g, false, _) => tool_buttons[2].set_active(true),
+                (gdk::Key::a, false, _) => tool_buttons[3].set_active(true),
+                (gdk::Key::p, false, _) => tool_buttons[4].set_active(true),
+                (gdk::Key::t, false, _) => tool_buttons[5].set_active(true),
                 (gdk::Key::_1, false, _) => size_buttons[0].set_active(true),
                 (gdk::Key::_2, false, _) => size_buttons[1].set_active(true),
                 (gdk::Key::_3, false, _) => size_buttons[2].set_active(true),
